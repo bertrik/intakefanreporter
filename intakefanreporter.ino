@@ -55,6 +55,7 @@ void loop(void)
 {
     static unsigned long last_tick = 0;
     static int last_state = -1;
+    static int fail_count = 0;
 
     // check state once a second
     unsigned long tick = millis() / 1000;
@@ -64,11 +65,20 @@ void loop(void)
         int state = (analogRead(PIN_STATE) > 512);
         if (state != last_state) {
             // send a message if the state changed
-            mqtt_send("revspace/intakefan/state", state ? "on" : "off", true);
-            last_state = state;
+            if (mqtt_send("revspace/intakefan/state", state ? "on" : "off", true)) {
+                last_state = state;
+                fail_count = 0;
+            } else {
+                fail_count++;
+                if (fail_count > 60) {
+                    Serial.println("MQTT publish failed, restarting ...");
+                    ESP.restart();
+                }
+            }
         }
     }
 
     ArduinoOTA.handle();
     mqttClient.loop();
 }
+
