@@ -6,6 +6,8 @@
 
 #define PIN_STATE   A0
 
+#define MQTT_TOPIC  "revspace/intakefan/state"
+
 static WiFiManager wifiManager;
 static WiFiClient wifiClient;
 static PubSubClient mqttClient(wifiClient);
@@ -13,13 +15,8 @@ static char esp_id[16];
 
 static bool mqtt_send(const char *topic, const char *value, bool retained)
 {
-    bool result = false;
-    if (!mqttClient.connected()) {
-        Serial.print("Connecting MQTT...");
-        result = mqttClient.connect(esp_id, topic, 0, retained, "unknown");
-        Serial.println(result ? "OK" : "FAIL");
-    }
-    if (mqttClient.connected()) {
+    bool result = mqttClient.connected();
+    if (result) {
         Serial.print("Publishing ");
         Serial.print(value);
         Serial.print(" to ");
@@ -62,18 +59,25 @@ void loop(void)
     if (tick != last_tick) {
         last_tick = tick;
 
+        // try to stay connected
+        if (mqttClient.connected()) {
+            fail_count = 0;
+        } else {
+            Serial.print("Connecting MQTT...");
+            if (!mqttClient.connect(esp_id, MQTT_TOPIC, 0, true, "unknown")) {
+                fail_count++;
+            }
+            if (fail_count > 60) {
+                Serial.println("MQTT connection failed, restarting ...");
+                ESP.restart();
+            }
+        }
+
+        // send a message if the state changed
         int state = (analogRead(PIN_STATE) > 512);
         if (state != last_state) {
-            // send a message if the state changed
-            if (mqtt_send("revspace/intakefan/state", state ? "on" : "off", true)) {
+            if (mqtt_send(MQTT_TOPIC, state ? "on" : "off", true)) {
                 last_state = state;
-                fail_count = 0;
-            } else {
-                fail_count++;
-                if (fail_count > 60) {
-                    Serial.println("MQTT publish failed, restarting ...");
-                    ESP.restart();
-                }
             }
         }
     }
