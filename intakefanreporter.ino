@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include <ArduinoOTA.h>
+#include "OTA_PASSWORD.h"
 #include <WiFiManager.h>
 #include <PubSubClient.h>
 
@@ -39,7 +40,7 @@ void setup(void)
     Serial.println(esp_id);
 
     ArduinoOTA.setHostname("esp-intakefan");
-    ArduinoOTA.setPassword("intakefan");
+    ArduinoOTA.setPassword(OTA_PASSWORD);
     ArduinoOTA.begin();
 
     wifiManager.setConfigPortalTimeout(120);
